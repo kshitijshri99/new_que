@@ -12,7 +12,7 @@ pipeline {
             steps {
                 withKubeConfig([credentialsId: 'k8s-config']) {
                     sh 'kubectl apply -f deployment.yaml'
-                    sh 'kubectl apply -f service.yaml"
+                    sh 'kubectl apply -f service.yaml'
                     sh 'kubectl rollout restart deployment/nginx-app'
                 }
             }
