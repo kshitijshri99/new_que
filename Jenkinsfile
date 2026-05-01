@@ -2,53 +2,32 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_USER = 'kshitijshri99' 
+        DOCKER_USER = 'kshitijshri99'
         REPO_NAME   = 'new_que'
         IMAGE_NAME  = "${DOCKER_USER}/${REPO_NAME}"
-        BUILD_TAG   = "${env.BUILD_NUMBER}"
     }
 
     stages {
-        stage('Checkout') {
+        stage('Deploy to K8s') {
             steps {
-                checkout scm
-            }
-        }
-
-        stage('Prepare Artifacts') {
-            steps {
-                script {
-                    sh 'if [ ! -f index.html ]; then echo "<h1>Build ${BUILD_TAG} successful!</h1>" > index.html; fi'
+                withKubeConfig([credentialsId: 'k8s-config']) {
+                    sh 'kubectl apply -f deployment.yaml'
+                    sh 'kubectl apply -f service.yaml"
+                    sh 'kubectl rollout restart deployment/nginx-app'
                 }
             }
         }
 
-        stage('Build Image') {
+        stage('Verify Deployment') {
             steps {
-                script {
-                    appImage = docker.build("${IMAGE_NAME}:${BUILD_TAG}", ".")
-                }
-            }
-        }
-
-        stage('Push to DockerHub') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-pass') {
-                        appImage.push("${BUILD_TAG}")
-                        appImage.push("latest")
+                withKubeConfig([credentialsId: 'k8s-config']) {
+                    script {
+                        sh 'kubectl get pods'
+                        sh 'kubectl get svc'
+                        sh 'kubectl rollout status deployment/nginx-app'
                     }
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "SUCCESS: Image ${IMAGE_NAME}:${BUILD_TAG} is now live on DockerHub."
-        }
-        failure {
-            echo "FAILURE: Check if 'dockerhub-pass' ID exists in Jenkins credentials."
         }
     }
 }
